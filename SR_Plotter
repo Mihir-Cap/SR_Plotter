@@ -1,0 +1,163 @@
+/@version=5
+//Developed by Mihir Madkaikar, India
+indicator('SR Plotter', shorttitle='SRP', overlay=true, max_bars_back=3000)
+
+TD = input(title='== TREND DIRECTION ==', defval=true)
+RISK = input(title='Risk', defval=14)
+SIZE = input.string(title='Size', defval=size.normal, options=[size.tiny, size.normal, size.large, size.huge])
+text_up = input(title='TEXT Buy', defval='B')
+text_dn = input(title='TEXT Sell', defval='S')
+
+custom_range(length) =>
+    sum = 0.0
+    for i = 1 to length - 5 by 1
+        sum += math.abs(close[i] - open[i])
+    sum / length
+
+custom_wpr(length) =>
+    upper = ta.highest(length)
+    lower = ta.lowest(length)
+    100 * (close - upper) / (upper - lower)
+
+MRO1(length, range_1) =>
+    true_count = 0
+    counter = 0
+    for i = 1 to length - 5 by 1
+        if math.abs(open[i] - close[i + 1]) >= range_1 * 2.0
+            true_count += 1
+            counter := i
+    mro = true_count >= 1 ? counter : -1
+    mro
+
+MRO2(length, range_2) =>
+    true_count = 0.0
+    counter = 0
+    for i = 1 to length - 1 by 1
+        if math.abs(close[i + 3] - close[i]) >= range_2 * 8.2
+            true_count += 1
+            counter := i
+    mro = true_count >= 1 ? counter : -1
+    mro
+
+TS(RISK) =>
+    value10 = math.abs(RISK / 180) + 1
+    x1 = 60 + RISK
+    x2 = 20 - RISK
+
+    rng = custom_range(2)
+    mro1 = MRO1(1, rng)
+    mro2 = MRO2(1, rng)
+
+    rez = if mro1 > -1
+        2
+    else
+        value10
+
+    rez1 = if mro2 > -1
+        2
+    else
+        value10
+
+    value2 = 100 - math.abs(custom_wpr(value10))
+
+    Table_value2 = value2
+
+    notset = false
+    ii1 = 1
+    for i1 = 1 to 50 by 1
+        if (Table_value2[i1] < x2 or Table_value2[i1] > x1) and notset == false
+            notset := true
+            ii1 := i1
+
+    z = Table_value2[ii1]
+
+    dn = value2 < x2 ? Table_value2[ii1] > x1 ? ii1 : 0 : 0
+    up = value2 > x1 ? Table_value2[ii1] < x2 ? ii1 : 0 : 0
+    [up, dn]
+
+[up, dn] = TS(RISK)
+
+text_label = up ? text_up : text_dn
+color_label = up ? color.new(color.aqua, 20) : color.new(color.red, 20)
+textcolor_label = up ? color.new(color.maroon, 20) : color.new(color.black, 20)
+style_label = up ? label.style_label_up : label.style_label_down
+y_label = up ? yloc.belowbar : yloc.abovebar
+x_pos = up ? up : dn
+
+_up = 0
+_dn = 0
+_up := ta.barssince(up)
+_dn := ta.barssince(dn)
+
+var label TS_UP_Label = na
+var label TS_DN_Label = na
+
+var AVG_RANGE = custom_range(RISK)
+var pos_y_up = low - AVG_RANGE * low
+var pos_y_dn = high + AVG_RANGE * high
+
+var oblique_up = line.new(na, na, na, na, color=color.blue, width=1)
+var oblique_dn = line.new(na, na, na, na, color=color.red, width=1)
+
+if up
+    line.set_xy1(oblique_up, bar_index - _up, pos_y_up)
+    line.set_xy2(oblique_up, bar_index, pos_y_up)
+
+if dn
+    line.set_xy1(oblique_dn, bar_index - _dn, pos_y_dn)
+    line.set_xy2(oblique_dn, bar_index, pos_y_dn)
+
+// Diagonal trendlines
+if up
+    line.new(x1=bar_index - _up, y1=pos_y_up, x2=bar_index, y2=pos_y_up - AVG_RANGE * pos_y_up, color=color.blue, width=2)
+if dn
+    line.new(x1=bar_index - _dn, y1=pos_y_dn, x2=bar_index, y2=pos_y_dn + AVG_RANGE * pos_y_dn, color=color.red, width=2)
+
+showSR = input(title='Show Supports & Resistances', defval=true)
+left = input(50, title='Left Pivot')
+right = input(25, title='Right Pivot')
+quick_right = input(5, title='Quick Right Pivot')
+
+pivot_high = ta.pivothigh(high, left, right)
+pivot_lows = ta.pivotlow(low, left, right)
+
+quick_pivot_high = ta.pivothigh(high, left, quick_right)
+quick_pivot_lows = ta.pivotlow(low, left, quick_right)
+
+level1 = ta.valuewhen(quick_pivot_high, high[quick_right], 0)
+level2 = ta.valuewhen(quick_pivot_lows, low[quick_right], 0)
+level3 = ta.valuewhen(pivot_high, high[right], 0)
+level4 = ta.valuewhen(pivot_lows, low[right], 0)
+level5 = ta.valuewhen(pivot_high, high[right], 1)
+level6 = ta.valuewhen(pivot_lows, low[right], 1)
+level7 = ta.valuewhen(pivot_high, high[right], 2)
+level8 = ta.valuewhen(pivot_lows, low[right], 2)
+
+level1_col = close >= level1 ? color.green : color.red
+level2_col = close >= level2 ? color.green : color.red
+level3_col = close >= level3 ? color.green : color.red
+level4_col = close >= level4 ? color.green : color.red
+level5_col = close >= level5 ? color.green : color.red
+level6_col = close >= level6 ? color.green : color.red
+level7_col = close >= level7 ? color.green : color.red
+level8_col = close >= level8 ? color.green : color.red
+
+event = close >= level6
+since_event = ta.barssince(event)
+first_event = since_event == 1
+
+second_event = close < level6
+since_second_event = ta.barssince(second_event)
+sec_event = since_second_event == 1
+
+plot(showSR ? level1 : na, style=plot.style_circles, color=level1_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level2 : na, style=plot.style_circles, color=level2_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level3 : na, style=plot.style_circles, color=level3_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level4 : na, style=plot.style_circles, color=level4_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level5 : na, style=plot.style_circles, color=level5_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level6 : na, style=plot.style_circles, color=level6_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level7 : na, style=plot.style_circles, color=level7_col, show_last=1, linewidth=2, trackprice=true)
+plot(showSR ? level8 : na, style=plot.style_circles, color=level8_col, show_last=1, linewidth=2, trackprice=true)
+
+bgcolor(first_event ? color.new(color.green, 80) : na)
+bgcolor(sec_event ? color.new(color.red, 80) : na)
